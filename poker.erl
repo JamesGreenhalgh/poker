@@ -1,5 +1,5 @@
 -module(poker).
--export([get_best_hand/2, deal_n_cards/2, shuffled_deck/0, jim/0, test/0, play_hands/1]).
+-export([format_evaluated_hand/1, format_cards/1, get_best_hand/2, deal_n_cards/2, shuffled_deck/0, jim/0, test/0, play_hands/1]).
 
 -define(S, 	[{2,h}, {3,h}, {4,h}, {5,h}, {6,h}, {7,h}, {8,h}, {9,h}, {t,h}, {j,h}, {q,h}, {k,h}, {a,h},
 		{2,c}, {3,c}, {4,c}, {5,c}, {6,c}, {7,c}, {8,c}, {9,c}, {t,c}, {j,c}, {q,c}, {k,c}, {a,c},
@@ -11,6 +11,54 @@
 		{2,c}, {3,c}, {4,c}, {5,c}, {6,c}, {7,c}, {8,c}, {9,c}, {10,c}, {11,c}, {12,c}, {13,c}, {14,c},
 		{2,s}, {3,s}, {4,s}, {5,s}, {6,s}, {7,s}, {8,s}, {9,s}, {10,s}, {11,s}, {12,s}, {13,s}, {14,s},
 		{2,d}, {3,d}, {4,d}, {5,d}, {6,d}, {7,d}, {8,d}, {9,d}, {10,d}, {11,d}, {12,d}, {13,d}, {14,d}]).
+
+
+format_cards(Cards) ->
+	lists:flatten([rank_to_string(Rank)++suit_to_string(Suit)++", " || {Rank, Suit} <- Cards]).
+
+suit_to_string(Suit) ->
+	string:to_upper(atom_to_list(Suit)).
+
+rank_to_string(Rank) ->
+	case Rank of 
+		14 -> "A";
+		13 -> "K";
+		12 -> "Q";
+		11 -> "J";
+		10 -> "T";
+		X -> integer_to_list(X)
+	end.
+
+format_evaluated_hand(Hand) ->
+	[Type | Kicker] = Hand,
+	String = case(Type) of
+		9 ->
+			rank_to_string(Kicker) ++ " high straight flush";
+		8 ->
+			[FourOf | Rest] = Kicker,
+			"Four " ++ rank_to_string(FourOf) ++ "s + " ++ [rank_to_string(X)++", " || X <- Rest];
+		7 ->
+			[ThreeOf | [TwoOf|Rest]] = Kicker,
+			"Full House: 3 " ++ rank_to_string(ThreeOf) ++ ". Two of " ++ rank_to_string(TwoOf) ++ " + " ++ [rank_to_string(X)++", " || X <- Rest];
+		6 ->
+			"Flush + " ++ [rank_to_string(X)++", " || X <- Kicker];
+		5 ->
+			rank_to_string(hd(Kicker)) ++ " high straight";
+		4 ->
+			[Threes | Rest] = Kicker,
+			"Three " ++ rank_to_string(Threes) ++ "s + " ++ [rank_to_string(X)++", " || X <- Rest];
+		3 ->
+			[PairOne | [PairTwo|Rest]] = Kicker,
+			"Two Pairs: " ++ rank_to_string(PairOne) ++ " and " ++ rank_to_string(PairTwo) ++ " + " ++ [rank_to_string(X)++", " || X <- Rest];
+		2 ->
+			[Pair | Rest] = Kicker,
+			"Pair of " ++ rank_to_string(Pair) ++ "s + " ++ [rank_to_string(X)++", " || X <- Rest];
+		1 ->
+			"High: " ++ [rank_to_string(X)++", " || X <- Kicker];
+		X ->
+			"Error: " ++ X
+	end,
+	lists:flatten(String).
 
 shuffled_deck() ->
 	shuffle(?START_DECK_INTEGER).
@@ -137,7 +185,7 @@ sort(Hand) ->
 	lists:keysort(1, Hand).
 
 has_flush([{_,X},{_,X},{_,X},{_,X},{_,X}]) ->
-		alush;
+	flush;
 has_flush(_Hand) ->
 	noflush.
 %% This system allows for community cards like in hold em.
@@ -192,6 +240,21 @@ evaluate_hand(Hand) ->
 			X
 	end.	
 
+hand_to_int(Hand) ->
+	Hands = [{straight_flush,9},
+		{quads,8},
+		{full_house,7},
+		{flush,6},
+		{straight,5},
+		{three_of_a_kind,4},
+		{two_pair,3},
+		{pair,2},
+		{high,1}],
+	{value, {Hand, Rank}} = lists:keysearch(Hand, 1, Hands),
+	Rank.
+
+
+
 %just_hand_order(SameHand, SameHand) ->
 %	false;
 %just_hand_order({Hand, Kicker}, {Hand, Kicker2}) ->
@@ -220,23 +283,25 @@ evaluate_hand(Hand) ->
 %compare_kicker([], []) ->
 %	false.
 %
-hand_to_int(Hand) ->
-	Hands = [{straight_flush,9},
-		{quads,8},
-		{full_house,7},
-		{flush,6},
-		{straight,5},
-		{three_of_a_kind,4},
-		{two_pair,3},
-		{pair,2},
-		{high,1}],
-	{value, {Hand, Rank}} = lists:keysearch(Hand, 1, Hands),
-	Rank.
+%int_to_hand(Int) ->
+%	case Int of
+%		9 -> "Straight flush";
+%               8 -> "Quads";
+%                7 -> "Full House";
+%                6 -> "Flush";
+%                5 -> "Straight";
+%                4 -> "Three Of A Kind";
+%                3 -> "Two Pair";
+%                2 -> "Pair";
+%                1 -> "High";
+%		_ -> undefined
+%	end.
+
 
 %rank_order({A,_}, {B,_}) ->
 %	rank_to_int(A) < rank_to_int(B).
 %rank_to_int(A) ->
-%	case A of
+%%	case A of
 %		a -> 14;
 %		k -> 13;
 %		q -> 12;
@@ -244,27 +309,3 @@ hand_to_int(Hand) ->
 %		t -> 10;
 %		X -> X
 %	end.
-
-
-
-% slacker
-
-% Single player straight flush? Winner
-% Multiple straight flush? Winner is the one with the highest card. If multiple people share the highest card (obviously in a different suit) they split the pot. (Note: Royal flush is excluded because it's just a special straight flush that no one else can beat.)
-%    Does any single player have 4 of a kind? If yes, he is the winner.
-%    Do multiple players have 4 of a kind? If yes, the one with the highest 'set of 4' is the winner. If multiple players have the highest set of 4 (which is not achievable with a standard poker deck, but is with a double deck or community cards), the one with the highest kicker (highest card not in the set of 4) is the winner. If this card is the same, they split the pot.
-%    Does any single player have a full house? If yes, he is the winner.
-%    Do multiple players have full houses? If yes, then keeping in mind that a full house is a 3-set and a 2-set, the player with the highest 3-set wins the pot. If multiple players share the highest 3-set (which isn't possible without community cards like in hold 'em, or a double deck) then the player with the highest 2-set is the winner. If the 2-set and 3-set is the same, those players split the pot.
-%    Does any single player have a flush? If yes, he is the winner.
-%    Do multiple players have a flush? If yes, the player with a flush with the highest unique card is the winner. This hand is similar to 'high card' resolution, where each card is effectively a kicker. Note that a flush requires the same suit, not just color. While the colors used on the suit are red and black, two each, there's nothing to that connection. A club is no more similar to a spade than it is to a heart - only suit matters. The colors are red and black for historical purposes and so the same deck can be played for other games where that might matter.
-%    Does any single player have a straight? If yes, he wins the pot.
-%    Do multiple players have straights? If so, the player with the highest straight wins. (a-2-3-4-5 is the lowest straight, while 10-j-q-k-a is the highest straight.) If multiple players share the highest straight, they split the pot.
-%    Does any single player have a 3 of a kind? If yes, he wins the pot.
-%    Do multiple players have 3 of a kind? If yes, the player with the highest 3-set wins the pot. If multiple players have the highest 3-set, the player with the highest kicker wins the pot. If multiple players tie for highest 3-set and highest kicker, the player with the next highest kicker wins the pot. If the players tie for the highest 3-set, highest kicker, and highest second kicker, the players split the pot.
-%    Does any single player have 2-pair? If yes, he wins the pot.
-%    Do multiple players have 2-pair? If yes, the player with the highest pair wins the pot. If multiple players tie for the highest pair, the player with the second highest pair wins the pot. If multiple players tie for both pairs, the player with the highest kicker wins the pot. If multiple players tie for both pairs and the kicker, the players split the pot.
-%    Does any single player have a pair? If yes, he wins the pot.
-%    Do multiple players have a pair? If yes, the player with the highest pair win. If multiple players have the highest pair, the player with the highest kicker wins. Compare second and third kickers as expected to resolve conflicts, or split if all three kickers tie.
-%    At this point, all cards are kickers, so compare the first, second, third, fourth, and if necessary, fifth highest cards in order until a winner is resolved, or split the pot if the hands are identical.
-%
-
